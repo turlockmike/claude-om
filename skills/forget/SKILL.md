@@ -13,7 +13,7 @@ Remove specific observations from the observational memory system.
 
 1. **Determine the memory directory** by running:
    ```bash
-   echo ~/.claude/projects/$(pwd | tr '/' '-')/memory/
+   python3 -c "import os; print(os.path.expanduser('~/.claude/projects/' + os.getcwd().replace('/','-') + '/memory/'))"
    ```
 
 2. **Read the observations file** (`observations.md`) from that directory.

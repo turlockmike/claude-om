@@ -13,7 +13,7 @@ You are being asked to manually extract observations from the current conversati
 
 1. **Determine the memory directory** by running:
    ```bash
-   echo ~/.claude/projects/$(pwd | tr '/' '-')/memory/
+   python3 -c "import os; print(os.path.expanduser('~/.claude/projects/' + os.getcwd().replace('/','-') + '/memory/'))"
    ```
 
 2. **Read the current observations file** at that path (`observations.md`). If it doesn't exist, you'll create it.
