@@ -71,6 +71,7 @@ def call_claude(system_prompt, user_prompt):
 
     env = os.environ.copy()
     env['OM_HOOK_ACTIVE'] = '1'
+    env.pop('CLAUDECODE', None)  # Allow nested claude -p invocation
 
     try:
         result = subprocess.run(
