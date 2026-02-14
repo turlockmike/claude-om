@@ -266,30 +266,46 @@ def parse_observer_output(raw_output):
     """Parse XML sections from observer output.
 
     Returns (observations, current_task, suggested_response).
+    Uses line-start anchored regex (like Mastra) to avoid matching inline mentions.
     Falls back to treating the entire output as observations if no XML tags found.
     """
     observations = ''
     current_task = None
     suggested_response = None
 
-    # Extract <observations> content
-    obs_match = re.search(r'<observations>(.*?)</observations>', raw_output, re.DOTALL)
+    # Extract <observations> content — tags must be at start of line
+    obs_match = re.search(
+        r'^[ \t]*<observations>(.*?)^[ \t]*</observations>',
+        raw_output, re.DOTALL | re.MULTILINE
+    )
     if obs_match:
         observations = obs_match.group(1).strip()
     else:
-        # Fallback: treat entire output as observations (minus any other XML tags)
+        # Fallback: treat entire output as observations (minus line-start XML tags)
         observations = raw_output
-        observations = re.sub(r'<current-task>.*?</current-task>', '', observations, flags=re.DOTALL)
-        observations = re.sub(r'<suggested-response>.*?</suggested-response>', '', observations, flags=re.DOTALL)
+        observations = re.sub(
+            r'^[ \t]*<current-task>.*?^[ \t]*</current-task>',
+            '', observations, flags=re.DOTALL | re.MULTILINE
+        )
+        observations = re.sub(
+            r'^[ \t]*<suggested-response>.*?^[ \t]*</suggested-response>',
+            '', observations, flags=re.DOTALL | re.MULTILINE
+        )
         observations = observations.strip()
 
-    # Extract <current-task>
-    task_match = re.search(r'<current-task>(.*?)</current-task>', raw_output, re.DOTALL)
+    # Extract <current-task> — tags must be at start of line
+    task_match = re.search(
+        r'^[ \t]*<current-task>(.*?)^[ \t]*</current-task>',
+        raw_output, re.DOTALL | re.MULTILINE
+    )
     if task_match:
         current_task = task_match.group(1).strip() or None
 
-    # Extract <suggested-response>
-    resp_match = re.search(r'<suggested-response>(.*?)</suggested-response>', raw_output, re.DOTALL)
+    # Extract <suggested-response> — tags must be at start of line
+    resp_match = re.search(
+        r'^[ \t]*<suggested-response>(.*?)^[ \t]*</suggested-response>',
+        raw_output, re.DOTALL | re.MULTILINE
+    )
     if resp_match:
         suggested_response = resp_match.group(1).strip() or None
 
