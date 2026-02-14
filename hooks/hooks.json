@@ -1,0 +1,41 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/observer.py",
+            "timeout": 120,
+            "statusMessage": "Observing conversation...",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/load-observations.py",
+            "timeout": 10,
+            "statusMessage": "Loading observational memory..."
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/reflector.py",
+            "timeout": 180,
+            "statusMessage": "Reflecting on observations..."
+          }
+        ]
+      }
+    ]
+  }
+}

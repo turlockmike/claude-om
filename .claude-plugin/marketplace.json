@@ -1,0 +1,9 @@
+{
+  "name": "claude-om-marketplace",
+  "plugins": [
+    {
+      "id": "claude-om",
+      "path": "."
+    }
+  ]
+}

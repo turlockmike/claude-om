@@ -1,0 +1,8 @@
+{
+  "name": "claude-om",
+  "version": "1.0.0",
+  "description": "Observational Memory for Claude Code — automatic long-term memory across sessions",
+  "author": "turlockmike",
+  "hooks": "hooks/hooks.json",
+  "skills": "skills/"
+}

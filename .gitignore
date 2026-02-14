@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+*.pyo
+om-error.log
+.DS_Store
