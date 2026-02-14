@@ -17,9 +17,9 @@ Observations are stored per-project in `~/.claude/projects/<project>/memory/obse
 ## Installation
 
 ```bash
-# Add the marketplace and enable the plugin
+# Add the marketplace and install the plugin
 claude plugin marketplace add turlockmike/claude-om
-claude plugin enable claude-om
+claude plugin install claude-om
 ```
 
 ## Configuration
