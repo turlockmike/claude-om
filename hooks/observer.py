@@ -173,7 +173,7 @@ def load_state(memory_dir):
     return {'last_observed_line': 0, 'transcript_path': ''}
 
 
-def save_state(memory_dir, last_line, transcript_path):
+def save_state(memory_dir, last_line, transcript_path, current_task=None, suggested_response=None):
     """Save observer cursor state."""
     state_file = memory_dir / '.observer-state.json'
     state = {
@@ -181,6 +181,10 @@ def save_state(memory_dir, last_line, transcript_path):
         'transcript_path': transcript_path,
         'last_observed_at': datetime.now(timezone.utc).isoformat()
     }
+    if current_task:
+        state['current_task'] = current_task
+    if suggested_response:
+        state['suggested_response'] = suggested_response
     state_file.write_text(json.dumps(state, indent=2))
 
 
@@ -256,6 +260,40 @@ def log_error(message, memory_dir=None):
             f.write(f"[{ts}] {message}\n")
     except IOError:
         pass
+
+
+def parse_observer_output(raw_output):
+    """Parse XML sections from observer output.
+
+    Returns (observations, current_task, suggested_response).
+    Falls back to treating the entire output as observations if no XML tags found.
+    """
+    observations = ''
+    current_task = None
+    suggested_response = None
+
+    # Extract <observations> content
+    obs_match = re.search(r'<observations>(.*?)</observations>', raw_output, re.DOTALL)
+    if obs_match:
+        observations = obs_match.group(1).strip()
+    else:
+        # Fallback: treat entire output as observations (minus any other XML tags)
+        observations = raw_output
+        observations = re.sub(r'<current-task>.*?</current-task>', '', observations, flags=re.DOTALL)
+        observations = re.sub(r'<suggested-response>.*?</suggested-response>', '', observations, flags=re.DOTALL)
+        observations = observations.strip()
+
+    # Extract <current-task>
+    task_match = re.search(r'<current-task>(.*?)</current-task>', raw_output, re.DOTALL)
+    if task_match:
+        current_task = task_match.group(1).strip() or None
+
+    # Extract <suggested-response>
+    resp_match = re.search(r'<suggested-response>(.*?)</suggested-response>', raw_output, re.DOTALL)
+    if resp_match:
+        suggested_response = resp_match.group(1).strip() or None
+
+    return observations, current_task, suggested_response
 
 
 def build_observer_prompt(new_messages_text, existing_observations):
@@ -400,10 +438,18 @@ def main():
         save_state(memory_dir, max_line + 1, transcript_path)
         return
 
-    # Clean up the result
-    observations_text = result.strip()
+    # Parse XML sections from result
+    observations_text, current_task, suggested_response = parse_observer_output(result)
+
+    # Clean up the observations
     observations_text = re.sub(r'^```\w*\n?', '', observations_text)
     observations_text = re.sub(r'\n?```$', '', observations_text)
+    observations_text = observations_text.strip()
+
+    if not observations_text:
+        max_line = max(m.get('_line_num', 0) for m in all_messages)
+        save_state(memory_dir, max_line + 1, transcript_path, current_task, suggested_response)
+        return
 
     # Append new observations
     with open(observations_file, 'a') as f:
@@ -412,9 +458,9 @@ def main():
         f.write(observations_text)
         f.write('\n')
 
-    # Update cursor
+    # Update cursor with task continuity data
     max_line = max(m.get('_line_num', 0) for m in all_messages)
-    save_state(memory_dir, max_line + 1, transcript_path)
+    save_state(memory_dir, max_line + 1, transcript_path, current_task, suggested_response)
 
     # Check if reflection is needed
     updated_content = observations_file.read_text()

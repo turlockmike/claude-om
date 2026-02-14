@@ -60,6 +60,27 @@ def main():
     except Exception:
         last_updated = 'unknown'
 
+    # Load task continuity from observer state
+    state_file = memory_dir / '.observer-state.json'
+    current_task = None
+    suggested_response = None
+    try:
+        if state_file.exists():
+            state = json.loads(state_file.read_text())
+            current_task = state.get('current_task')
+            suggested_response = state.get('suggested_response')
+    except (json.JSONDecodeError, IOError):
+        pass
+
+    # Build continuity section
+    continuity = ''
+    if current_task or suggested_response:
+        continuity = '\n### Task Continuity (from last session)\n'
+        if current_task:
+            continuity += f'- **Last task**: {current_task}\n'
+        if suggested_response:
+            continuity += f'- **Suggested next step**: {suggested_response}\n'
+
     context = f"""## Observational Memory
 
 The following observations were automatically extracted from your previous conversations with this user. They represent your long-term memory across sessions.
@@ -67,7 +88,7 @@ The following observations were automatically extracted from your previous conve
 <observations>
 {observations}
 </observations>
-
+{continuity}
 ### How to use these observations:
 - Reference specific details from observations when relevant to the current task
 - Prefer the MOST RECENT information when observations conflict

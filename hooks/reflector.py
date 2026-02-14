@@ -19,9 +19,39 @@ from pathlib import Path
 REFLECTOR_MODEL = os.environ.get("OM_REFLECTOR_MODEL", "haiku")
 # Minimum size to bother reflecting (chars)
 MIN_REFLECT_CHARS = 5000
+# Maximum retries with escalating compression
+MAX_COMPRESSION_RETRIES = 3
 
 # Script directory for locating prompts
 SCRIPT_DIR = Path(__file__).resolve().parent
+
+# Graduated compression guidance (level 0, 1, 2)
+COMPRESSION_GUIDANCE = {
+    0: '',  # No extra guidance on first attempt
+    1: """
+## COMPRESSION REQUIRED
+
+Your previous reflection was too large. Please re-process with more compression:
+- Towards the beginning, condense more observations into higher-level summaries
+- Closer to the end, retain more fine details (recent context matters more)
+- Combine related items more aggressively but do not lose important specific details
+- If there are long nested tool call sequences, combine into single-line summaries
+
+Target detail level: 8/10 (slightly more condensed).
+""",
+    2: """
+## AGGRESSIVE COMPRESSION REQUIRED
+
+Your previous reflection was still too large. Please re-process with much more aggressive compression:
+- Towards the beginning, heavily condense into high-level summaries
+- Closer to the end, retain fine details (recent context matters more)
+- Combine related items aggressively but preserve names, numbers, and key identifiers
+- Remove redundant information and merge overlapping observations
+- Drop 🟢 low priority items unless they contain unique information
+
+Target detail level: 6/10 (significantly more condensed).
+""",
+}
 
 
 def get_project_dir(transcript_path):
@@ -116,7 +146,7 @@ def log_error(message, memory_dir=None):
 
 
 def reflect(memory_dir, force=False):
-    """Run reflection on the observations file."""
+    """Run reflection on the observations file with graduated compression retries."""
     observations_file = memory_dir / 'observations.md'
     if not observations_file.exists():
         return False, "No observations file found"
@@ -132,24 +162,51 @@ def reflect(memory_dir, force=False):
     if not system_prompt:
         return False, "Reflector system prompt not found"
 
-    user_prompt = (
-        f"## Observations to Reflect On\n\n"
-        f"{content}\n\n"
-        f"---\n\n"
-        f"Condense these observations. Today's date is "
-        f"{datetime.now(timezone.utc).strftime('%Y-%m-%d')}. "
-        f"Current size: {len(content)} characters ({len(content) // 4} approx tokens). "
-        f"Target: ~{len(content) // 2} characters."
-    )
+    target_chars = len(content) // 2
+    reflected = None
 
-    result = call_claude(system_prompt, user_prompt)
-    if not result or len(result.strip()) < 50:
-        return False, "Reflector returned empty or too-short result"
+    for level in range(MAX_COMPRESSION_RETRIES):
+        guidance = COMPRESSION_GUIDANCE.get(level, '')
 
-    # Clean up
-    reflected = result.strip()
-    reflected = re.sub(r'^```\w*\n?', '', reflected)
-    reflected = re.sub(r'\n?```$', '', reflected)
+        user_prompt = (
+            f"## Observations to Reflect On\n\n"
+            f"{content}\n\n"
+            f"---\n\n"
+            f"Condense these observations. Today's date is "
+            f"{datetime.now(timezone.utc).strftime('%Y-%m-%d')}. "
+            f"Current size: {len(content)} characters ({len(content) // 4} approx tokens). "
+            f"Target: ~{target_chars} characters."
+        )
+
+        if guidance:
+            user_prompt += f"\n{guidance}"
+
+        result = call_claude(system_prompt, user_prompt)
+        if not result or len(result.strip()) < 50:
+            if level == 0:
+                return False, "Reflector returned empty or too-short result"
+            break  # Use the previous attempt's result
+
+        # Clean up
+        candidate = result.strip()
+        candidate = re.sub(r'^```\w*\n?', '', candidate)
+        candidate = re.sub(r'\n?```$', '', candidate)
+
+        reflected = candidate
+
+        # Check if compression was sufficient
+        if len(reflected) <= len(content):
+            break  # Good enough — it's smaller than the input
+
+        # If output is larger than input, retry with more compression
+        log_error(
+            f"Reflection level {level} produced {len(reflected)} chars "
+            f"(input: {len(content)}), retrying with more compression",
+            memory_dir
+        )
+
+    if not reflected:
+        return False, "All reflection attempts failed"
 
     # Archive pre-reflection version
     archive_file = memory_dir / 'reflections.log'
