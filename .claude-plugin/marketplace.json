@@ -1,9 +1,21 @@
 {
   "name": "claude-om-marketplace",
+  "description": "Observational Memory for Claude Code",
+  "owner": {
+    "name": "turlockmike",
+    "url": "https://github.com/turlockmike"
+  },
   "plugins": [
     {
-      "id": "claude-om",
-      "path": "."
+      "name": "claude-om",
+      "description": "Observational Memory for Claude Code — automatic long-term memory across sessions",
+      "version": "1.0.0",
+      "author": {
+        "name": "turlockmike",
+        "url": "https://github.com/turlockmike"
+      },
+      "source": "./.",
+      "category": "productivity"
     }
   ]
 }
